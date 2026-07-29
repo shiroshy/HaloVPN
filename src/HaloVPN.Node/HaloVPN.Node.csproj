@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\HaloVPN.Protocol.Abstractions\HaloVPN.Protocol.Abstractions.csproj" />
+    <ProjectReference Include="..\HaloVPN.Protocol.Interop\HaloVPN.Protocol.Interop.csproj" />
+    <ProjectReference Include="..\HaloVPN.Transport\HaloVPN.Transport.csproj" />
+    <ProjectReference Include="..\HaloVPN.Shared\HaloVPN.Shared.csproj" />
+    <ProjectReference Include="..\HaloVPN.Infrastructure\HaloVPN.Infrastructure.csproj" />
+    <ProjectReference Include="..\HaloVPN.Node.Core\HaloVPN.Node.Core.csproj" />
+    <ProjectReference Include="..\HaloVPN.Platform.Linux\HaloVPN.Platform.Linux.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

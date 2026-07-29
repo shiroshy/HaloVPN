@@ -1,0 +1,24 @@
+[package]
+name = "halo-protocol"
+version = "0.0.1"
+edition = "2024"
+publish = false
+
+[lib]
+name = "halo_protocol"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+snow = { version = "=0.10.0", features = ["default-resolver"] }
+subtle = "=2.6.1"
+zeroize = { version = "=1.9.0", features = ["alloc"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+panic = "unwind"
+strip = "symbols"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"

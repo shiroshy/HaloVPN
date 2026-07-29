@@ -1,0 +1,33 @@
+[package]
+name = "halo-protocol-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+halo-protocol = { path = ".." }
+libfuzzer-sys = "=0.4.13"
+
+[[bin]]
+name = "handshake_input"
+path = "fuzz_targets/handshake_input.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decrypt_input"
+path = "fuzz_targets/decrypt_input.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "abi_length_handling"
+path = "fuzz_targets/abi_length_handling.rs"
+test = false
+doc = false
+bench = false

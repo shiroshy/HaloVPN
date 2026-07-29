@@ -1,0 +1,17 @@
+[Unit]
+Description=HaloVPN owned nftables rules
+Documentation=file:/opt/halovpn/deploy/linux/README.md
+Wants=network-online.target
+After=network-online.target ufw.service
+Before=halovpn-node.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=/etc/halovpn/firewall.env
+ExecStart=/usr/local/libexec/halovpn/install-nftables.sh ${HALOVPN_EXTERNAL_INTERFACE}
+ExecReload=/usr/local/libexec/halovpn/install-nftables.sh ${HALOVPN_EXTERNAL_INTERFACE}
+ExecStop=/usr/local/libexec/halovpn/remove-nftables.sh
+
+[Install]
+WantedBy=multi-user.target

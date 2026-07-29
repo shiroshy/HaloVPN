@@ -1,0 +1,46 @@
+<Window x:Class="HaloVPN.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="HaloVPN" Height="430" Width="520" MinHeight="430" MinWidth="520">
+  <Grid Margin="24">
+    <Grid x:Name="LoginPanel">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <TextBlock Text="HaloVPN" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,20" />
+      <TextBox x:Name="ControlPlaneUrlBox" Grid.Row="1" Margin="0,0,0,10" ToolTip="ControlPlane HTTPS URL" Text="https://" />
+      <TextBox x:Name="UsernameBox" Grid.Row="2" Margin="0,0,0,10" ToolTip="Username" />
+      <PasswordBox x:Name="PasswordBox" Grid.Row="3" Margin="0,0,0,16" ToolTip="Password" />
+      <Button x:Name="LoginButton" Grid.Row="4" Height="36" Content="Login" Click="Login_Click" />
+    </Grid>
+
+    <Grid x:Name="MainPanel" Visibility="Collapsed">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <TextBlock x:Name="NodeText" FontSize="24" FontWeight="SemiBold" />
+      <TextBlock x:Name="StateText" Grid.Row="1" Margin="0,16,0,6" FontSize="16" />
+      <TextBlock x:Name="AddressText" Grid.Row="2" Margin="0,0,0,6" />
+      <TextBlock x:Name="DiagnosticText" Grid.Row="3" Margin="0,0,0,18" TextWrapping="Wrap" />
+      <StackPanel Grid.Row="4" Orientation="Horizontal">
+        <Button x:Name="ConnectButton" Width="110" Height="36" Margin="0,0,10,0" Content="Connect" Click="Connect_Click" />
+        <Button x:Name="DisconnectButton" Width="110" Height="36" Content="Disconnect" Click="Disconnect_Click" />
+      </StackPanel>
+      <Button Grid.Row="6" Width="100" Height="32" HorizontalAlignment="Right" Content="Logout" Click="Logout_Click" />
+    </Grid>
+
+    <Border VerticalAlignment="Bottom" Background="#FFF5F5F5" Padding="8">
+      <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+    </Border>
+  </Grid>
+</Window>

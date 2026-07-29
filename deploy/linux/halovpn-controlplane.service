@@ -1,0 +1,23 @@
+[Unit]
+Description=HaloVPN ControlPlane
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=halovpn
+Group=halovpn
+WorkingDirectory=/opt/halovpn/controlplane
+EnvironmentFile=/etc/halovpn/halovpn.env
+ExecStart=/usr/bin/dotnet /opt/halovpn/controlplane/HaloVPN.ControlPlane.dll
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/halovpn
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
