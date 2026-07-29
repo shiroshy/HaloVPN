@@ -141,6 +141,32 @@ public sealed class WindowsLogicTests
     }
 
     [Fact]
+    public void WindowsPreflightIsReadOnlyAndContainsNoMachineSpecificSid()
+    {
+        var repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var script = File.ReadAllText(Path.Combine(repositoryRoot, "scripts", "preflight-windows.ps1"));
+        Assert.DoesNotContain("Start-Service", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Stop-Service", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Set-Net", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("New-Net", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Remove-Net", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotMatch(@"S-1-5-21-\d+", script);
+        Assert.Contains("No system state was changed", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TesterInstallerGeneratesLocalConfigurationWithoutBundledIdentity()
+    {
+        var repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var script = File.ReadAllText(Path.Combine(repositoryRoot, "scripts", "install-windows-test-bundle.ps1"));
+        Assert.Contains("Resolve-InteractiveUserSid", script, StringComparison.Ordinal);
+        Assert.Contains("Get-AuthenticodeSignature", script, StringComparison.Ordinal);
+        Assert.Contains("Device private key will be generated locally", script, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"S-1-5-21-\d+", script);
+        Assert.DoesNotContain("ControlPlaneUrl", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task TypedGuardJournalRoundTripsAndRejectsCommandPayload()
     {
         var directory = Path.Combine(Path.GetTempPath(), "halovpn-guard-test-" + Guid.NewGuid().ToString("N"));

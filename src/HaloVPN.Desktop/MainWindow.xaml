@@ -1,46 +1,395 @@
 <Window x:Class="HaloVPN.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="HaloVPN" Height="430" Width="520" MinHeight="430" MinWidth="520">
-  <Grid Margin="24">
-    <Grid x:Name="LoginPanel">
-      <Grid.RowDefinitions>
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-      </Grid.RowDefinitions>
-      <TextBlock Text="HaloVPN" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,20" />
-      <TextBox x:Name="ControlPlaneUrlBox" Grid.Row="1" Margin="0,0,0,10" ToolTip="ControlPlane HTTPS URL" Text="https://" />
-      <TextBox x:Name="UsernameBox" Grid.Row="2" Margin="0,0,0,10" ToolTip="Username" />
-      <PasswordBox x:Name="PasswordBox" Grid.Row="3" Margin="0,0,0,16" ToolTip="Password" />
-      <Button x:Name="LoginButton" Grid.Row="4" Height="36" Content="Login" Click="Login_Click" />
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="HaloVPN"
+        Width="468"
+        Height="700"
+        MinWidth="440"
+        MinHeight="650"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        Background="{StaticResource WindowBackgroundBrush}">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="52"
+                        ResizeBorderThickness="6"
+                        GlassFrameThickness="0"
+                        CornerRadius="0"
+                        UseAeroCaptionButtons="False" />
+  </shell:WindowChrome.WindowChrome>
+
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="52" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <Border Grid.Row="0"
+            BorderBrush="#162A42"
+            BorderThickness="0,0,0,1"
+            Background="#091522">
+      <Grid Margin="18,0,10,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="42" />
+          <ColumnDefinition Width="42" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Orientation="Horizontal"
+                    VerticalAlignment="Center">
+          <Grid Width="30" Height="24" Margin="0,0,10,0">
+            <Ellipse Width="28"
+                     Height="10"
+                     Stroke="{StaticResource AccentGradientBrush}"
+                     StrokeThickness="2">
+              <Ellipse.Effect>
+                <DropShadowEffect Color="#4CC9FF"
+                                  BlurRadius="12"
+                                  ShadowDepth="0"
+                                  Opacity="0.72" />
+              </Ellipse.Effect>
+            </Ellipse>
+          </Grid>
+          <TextBlock VerticalAlignment="Center"
+                     Foreground="{StaticResource TextPrimaryBrush}"
+                     FontSize="17"
+                     FontWeight="SemiBold">
+            <Run Text="Halo" />
+            <Run Text="VPN" Foreground="{StaticResource AccentBrush}" />
+          </TextBlock>
+        </StackPanel>
+
+        <Button Grid.Column="1"
+                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                Style="{StaticResource GhostButtonStyle}"
+                FontSize="18"
+                Content="—"
+                ToolTip="Свернуть"
+                Click="MinimizeButton_Click" />
+        <Button Grid.Column="2"
+                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                Style="{StaticResource GhostButtonStyle}"
+                FontSize="18"
+                Content="×"
+                ToolTip="Закрыть"
+                Click="CloseButton_Click" />
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" Margin="32,24,32,22">
+      <Grid x:Name="LoginPanel">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0"
+              Width="190"
+              Height="116"
+              HorizontalAlignment="Center"
+              Margin="0,6,0,12">
+          <Ellipse Width="174"
+                   Height="58"
+                   VerticalAlignment="Top"
+                   Margin="0,12,0,0"
+                   Stroke="{StaticResource AccentGradientBrush}"
+                   StrokeThickness="3.5">
+            <Ellipse.Effect>
+              <DropShadowEffect Color="#4CC9FF"
+                                BlurRadius="30"
+                                ShadowDepth="0"
+                                Opacity="0.78" />
+            </Ellipse.Effect>
+          </Ellipse>
+          <Ellipse Width="138"
+                   Height="42"
+                   VerticalAlignment="Top"
+                   Margin="0,20,0,0"
+                   Stroke="#443AC7FF"
+                   StrokeThickness="1" />
+          <TextBlock VerticalAlignment="Bottom"
+                     HorizontalAlignment="Center"
+                     Foreground="{StaticResource TextPrimaryBrush}"
+                     FontSize="31"
+                     FontWeight="SemiBold">
+            <Run Text="Halo" />
+            <Run Text="VPN" Foreground="{StaticResource AccentBrush}" />
+          </TextBlock>
+        </Grid>
+
+        <TextBlock Grid.Row="1"
+                   HorizontalAlignment="Center"
+                   Margin="0,0,0,4"
+                   Foreground="{StaticResource TextPrimaryBrush}"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Text="Добро пожаловать" />
+        <TextBlock Grid.Row="2"
+                   HorizontalAlignment="Center"
+                   Margin="0,0,0,24"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Text="Войдите, чтобы открыть защищённый туннель" />
+
+        <TextBlock Grid.Row="3"
+                   Margin="2,0,0,7"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   FontSize="12"
+                   FontWeight="SemiBold"
+                   Text="CONTROLPLANE URL" />
+        <TextBox x:Name="ControlPlaneUrlBox"
+                 Grid.Row="4"
+                 Margin="0,0,0,16"
+                 Style="{StaticResource FieldTextBoxStyle}"
+                 ToolTip="HTTPS-адрес ControlPlane"
+                 Text="https://" />
+
+        <Grid Grid.Row="5" Margin="0,0,0,16">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="14" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+            <TextBlock Margin="2,0,0,7"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       Text="ЛОГИН" />
+            <TextBox x:Name="UsernameBox"
+                     Style="{StaticResource FieldTextBoxStyle}"
+                     ToolTip="Имя пользователя" />
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+            <TextBlock Margin="2,0,0,7"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       Text="ПАРОЛЬ" />
+            <PasswordBox x:Name="PasswordBox"
+                         Style="{StaticResource FieldPasswordBoxStyle}"
+                         ToolTip="Пароль" />
+          </StackPanel>
+        </Grid>
+
+        <Button x:Name="LoginButton"
+                Grid.Row="6"
+                Margin="0,2,0,16"
+                Style="{StaticResource PrimaryButtonStyle}"
+                Content="ВОЙТИ"
+                Click="Login_Click" />
+
+        <StackPanel Grid.Row="7"
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal">
+          <Ellipse Width="7"
+                   Height="7"
+                   Margin="0,0,8,0"
+                   VerticalAlignment="Center"
+                   Fill="{StaticResource AccentBrush}" />
+          <TextBlock Foreground="{StaticResource TextSecondaryBrush}"
+                     FontSize="12"
+                     Text="Пароль используется только для HTTPS-авторизации" />
+        </StackPanel>
+      </Grid>
+
+      <Grid x:Name="MainPanel" Visibility="Collapsed">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Padding="18,15"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="14">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Border Width="42"
+                    Height="42"
+                    Margin="0,0,13,0"
+                    VerticalAlignment="Center"
+                    Background="#16324C"
+                    CornerRadius="12">
+              <Grid>
+                <Ellipse Width="20"
+                         Height="8"
+                         Stroke="{StaticResource AccentBrush}"
+                         StrokeThickness="2" />
+                <Ellipse Width="5"
+                         Height="5"
+                         Fill="{StaticResource AccentBrightBrush}" />
+              </Grid>
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+              <TextBlock Foreground="{StaticResource TextSecondaryBrush}"
+                         FontSize="11"
+                         FontWeight="SemiBold"
+                         Text="ВЫБРАННЫЙ УЗЕЛ" />
+              <TextBlock x:Name="NodeText"
+                         Margin="0,2,0,0"
+                         FontSize="18"
+                         FontWeight="SemiBold"
+                         Text="—" />
+            </StackPanel>
+            <Button x:Name="LogoutButton"
+                    Grid.Column="2"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                    Style="{StaticResource GhostButtonStyle}"
+                    Content="Выйти"
+                    Click="Logout_Click" />
+          </Grid>
+        </Border>
+
+        <Grid Grid.Row="1"
+              MinHeight="292"
+              Margin="0,12,0,4">
+          <Ellipse x:Name="HaloGlow"
+                   Width="286"
+                   Height="112"
+                   VerticalAlignment="Center"
+                   Stroke="{StaticResource AccentGradientBrush}"
+                   StrokeThickness="4">
+            <Ellipse.Effect>
+              <DropShadowEffect x:Name="HaloShadow"
+                                Color="#4CC9FF"
+                                BlurRadius="38"
+                                ShadowDepth="0"
+                                Opacity="0.72" />
+            </Ellipse.Effect>
+          </Ellipse>
+          <Ellipse Width="250"
+                   Height="88"
+                   VerticalAlignment="Center"
+                   Stroke="#364CC9FF"
+                   StrokeThickness="1" />
+          <Button x:Name="ConnectButton"
+                  Style="{StaticResource CircleButtonStyle}"
+                  Click="Connect_Click">
+            <StackPanel>
+              <Path Width="30"
+                    Height="30"
+                    HorizontalAlignment="Center"
+                    Data="M 12,2 L 12,12 M 5.64,5.64 A 9,9 0 1 0 18.36,5.64"
+                    Stretch="Uniform"
+                    Stroke="{StaticResource AccentBrightBrush}"
+                    StrokeThickness="2.2"
+                    StrokeStartLineCap="Round"
+                    StrokeEndLineCap="Round" />
+              <TextBlock x:Name="ConnectActionText"
+                         HorizontalAlignment="Center"
+                         Margin="0,7,0,0"
+                         FontSize="12"
+                         FontWeight="SemiBold"
+                         Text="ПОДКЛЮЧИТЬ" />
+            </StackPanel>
+          </Button>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Margin="0,0,0,16">
+          <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+            <Ellipse x:Name="StatusDot"
+                     Width="8"
+                     Height="8"
+                     Margin="0,0,8,0"
+                     VerticalAlignment="Center"
+                     Fill="{StaticResource TextSecondaryBrush}" />
+            <TextBlock x:Name="StateText"
+                       FontSize="17"
+                       FontWeight="SemiBold"
+                       Text="Отключено" />
+          </StackPanel>
+          <TextBlock x:Name="DiagnosticText"
+                     Margin="0,6,0,0"
+                     HorizontalAlignment="Center"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     FontSize="12"
+                     Text="Готово к подключению"
+                     TextAlignment="Center"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+
+        <Grid Grid.Row="3">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <Border Grid.Row="0"
+                  Margin="0,0,0,12"
+                  Padding="17,14"
+                  Background="{StaticResource SurfaceBrush}"
+                  BorderBrush="{StaticResource BorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="14">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="1" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Foreground="{StaticResource TextSecondaryBrush}"
+                           FontSize="11"
+                           Text="ВНУТРЕННИЙ IP" />
+                <TextBlock x:Name="AddressText"
+                           Margin="0,4,0,0"
+                           FontWeight="SemiBold"
+                           Text="—" />
+              </StackPanel>
+              <Border Grid.Column="1"
+                      Margin="0,0,18,0"
+                      Background="{StaticResource BorderBrush}" />
+              <StackPanel Grid.Column="2" Margin="18,0,0,0">
+                <TextBlock Foreground="{StaticResource TextSecondaryBrush}"
+                           FontSize="11"
+                           Text="ПРОТОКОЛ" />
+                <TextBlock Margin="0,4,0,0"
+                           FontWeight="SemiBold"
+                           Text="Halo / Noise IK" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Button x:Name="DisconnectButton"
+                  Grid.Row="1"
+                  Style="{StaticResource SecondaryButtonStyle}"
+                  Content="ОТКЛЮЧИТЬ"
+                  Click="Disconnect_Click" />
+        </Grid>
+      </Grid>
     </Grid>
 
-    <Grid x:Name="MainPanel" Visibility="Collapsed">
-      <Grid.RowDefinitions>
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="*" />
-        <RowDefinition Height="Auto" />
-      </Grid.RowDefinitions>
-      <TextBlock x:Name="NodeText" FontSize="24" FontWeight="SemiBold" />
-      <TextBlock x:Name="StateText" Grid.Row="1" Margin="0,16,0,6" FontSize="16" />
-      <TextBlock x:Name="AddressText" Grid.Row="2" Margin="0,0,0,6" />
-      <TextBlock x:Name="DiagnosticText" Grid.Row="3" Margin="0,0,0,18" TextWrapping="Wrap" />
-      <StackPanel Grid.Row="4" Orientation="Horizontal">
-        <Button x:Name="ConnectButton" Width="110" Height="36" Margin="0,0,10,0" Content="Connect" Click="Connect_Click" />
-        <Button x:Name="DisconnectButton" Width="110" Height="36" Content="Disconnect" Click="Disconnect_Click" />
-      </StackPanel>
-      <Button Grid.Row="6" Width="100" Height="32" HorizontalAlignment="Right" Content="Logout" Click="Logout_Click" />
-    </Grid>
-
-    <Border VerticalAlignment="Bottom" Background="#FFF5F5F5" Padding="8">
-      <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+    <Border x:Name="MessageBorder"
+            Grid.Row="2"
+            Margin="18,0,18,16"
+            Padding="13,10"
+            Background="#1A2538"
+            BorderBrush="#344B68"
+            BorderThickness="1"
+            CornerRadius="10"
+            Visibility="Collapsed">
+      <TextBlock x:Name="MessageText"
+                 Foreground="{StaticResource TextSecondaryBrush}"
+                 FontSize="12"
+                 TextAlignment="Center"
+                 TextWrapping="Wrap" />
     </Border>
   </Grid>
 </Window>

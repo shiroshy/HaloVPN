@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Media;
 using System.Net.Http;
 using System.Net;
 using System.Net.Sockets;
@@ -19,8 +20,14 @@ public partial class MainWindow : Window
     private VpnProfileResponse? _profile;
     private string? _refreshToken;
     private IReadOnlyList<string> _bootstrapIpv4Addresses = [];
+    private string _serviceState = "Disconnected";
+    private bool _isBusy;
 
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        UpdateConnectionVisual(_serviceState);
+    }
 
     private async void Login_Click(object sender, RoutedEventArgs e)
     {
@@ -50,9 +57,9 @@ public partial class MainWindow : Window
             await _tokenStore.SaveAsync(_refreshToken, cancellationToken).ConfigureAwait(true);
             _profile = registration.Profile;
             NodeText.Text = _profile.NodeName;
-            AddressText.Text = $"Tunnel address: {_profile.AssignedClientIpv4}";
-            StateText.Text = "Disconnected";
-            DiagnosticText.Text = "Ready to connect.";
+            AddressText.Text = _profile.AssignedClientIpv4;
+            DiagnosticText.Text = "Готово к защищённому подключению";
+            UpdateConnectionVisual("Disconnected");
             LoginPanel.Visibility = Visibility.Collapsed;
             MainPanel.Visibility = Visibility.Visible;
         }).ConfigureAwait(true);
@@ -64,8 +71,8 @@ public partial class MainWindow : Window
         {
             var profile = _profile ?? throw new InvalidOperationException("No VPN profile is loaded.");
             var response = await _service.SendAsync(IpcMessageType.Connect, profile, cancellationToken, _bootstrapIpv4Addresses).ConfigureAwait(true);
-            StateText.Text = response.Status?.State ?? "Connected";
-            DiagnosticText.Text = response.Status?.DiagnosticCode ?? "Noise tunnel established.";
+            UpdateConnectionVisual(response.Status?.State ?? "Connected");
+            DiagnosticText.Text = response.Status?.DiagnosticCode ?? "Noise-туннель установлен";
         }).ConfigureAwait(true);
     }
 
@@ -74,8 +81,8 @@ public partial class MainWindow : Window
         await RunUiOperationAsync(async cancellationToken =>
         {
             var response = await _service.SendAsync(IpcMessageType.Disconnect, null, cancellationToken).ConfigureAwait(true);
-            StateText.Text = response.Status?.State ?? "Disconnected";
-            DiagnosticText.Text = response.Status?.DiagnosticCode ?? "Tunnel stopped and owned network changes removed.";
+            UpdateConnectionVisual(response.Status?.State ?? "Disconnected");
+            DiagnosticText.Text = response.Status?.DiagnosticCode ?? "Защищённый туннель остановлен";
         }).ConfigureAwait(true);
     }
 
@@ -97,14 +104,15 @@ public partial class MainWindow : Window
             _controlPlane = null;
             MainPanel.Visibility = Visibility.Collapsed;
             LoginPanel.Visibility = Visibility.Visible;
-            MessageText.Text = "Logged out.";
+            UpdateConnectionVisual("Disconnected");
+            ShowMessage("Вы вышли из аккаунта.", isError: false);
         }).ConfigureAwait(true);
     }
 
     private async Task RunUiOperationAsync(Func<CancellationToken, Task> operation)
     {
         SetButtons(false);
-        MessageText.Text = string.Empty;
+        ShowMessage(null, isError: false);
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
@@ -112,7 +120,9 @@ public partial class MainWindow : Window
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException or InvalidOperationException or OperationCanceledException)
         {
-            MessageText.Text = exception is OperationCanceledException ? "Operation timed out or was cancelled." : exception.Message;
+            ShowMessage(
+                exception is OperationCanceledException ? "Операция завершилась по тайм-ауту." : exception.Message,
+                isError: true);
         }
         finally
         {
@@ -123,8 +133,68 @@ public partial class MainWindow : Window
 
     private void SetButtons(bool enabled)
     {
+        _isBusy = !enabled;
         LoginButton.IsEnabled = enabled;
-        ConnectButton.IsEnabled = enabled;
-        DisconnectButton.IsEnabled = enabled;
+        LogoutButton.IsEnabled = enabled;
+        UpdateConnectionVisual(_serviceState);
+    }
+
+    private void UpdateConnectionVisual(string state)
+    {
+        _serviceState = state;
+        var normalized = state.Trim();
+        var connected = normalized.Equals("Connected", StringComparison.OrdinalIgnoreCase);
+        var reconnecting = normalized.Contains("Reconnecting", StringComparison.OrdinalIgnoreCase);
+        var protectedFault = normalized.Contains("Protected", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("Guarded", StringComparison.OrdinalIgnoreCase);
+
+        if (connected)
+        {
+            StateText.Text = "Подключено";
+            StatusDot.Fill = new SolidColorBrush(Color.FromRgb(90, 232, 184));
+            HaloGlow.Stroke = new SolidColorBrush(Color.FromRgb(90, 232, 184));
+            HaloShadow.Color = Color.FromRgb(90, 232, 184);
+            ConnectActionText.Text = "ЗАЩИЩЕНО";
+        }
+        else if (reconnecting || protectedFault)
+        {
+            StateText.Text = reconnecting ? "Защищённое переподключение" : "Защита активна";
+            StatusDot.Fill = new SolidColorBrush(Color.FromRgb(255, 190, 92));
+            HaloGlow.Stroke = new SolidColorBrush(Color.FromRgb(255, 190, 92));
+            HaloShadow.Color = Color.FromRgb(255, 190, 92);
+            ConnectActionText.Text = "ЗАЩИЩЕНО";
+        }
+        else
+        {
+            StateText.Text = "Отключено";
+            StatusDot.Fill = (Brush)FindResource("TextSecondaryBrush");
+            HaloGlow.Stroke = (Brush)FindResource("AccentGradientBrush");
+            HaloShadow.Color = Color.FromRgb(76, 201, 255);
+            ConnectActionText.Text = "ПОДКЛЮЧИТЬ";
+        }
+
+        ConnectButton.IsEnabled = !_isBusy && !connected && !reconnecting && !protectedFault;
+        DisconnectButton.IsEnabled = !_isBusy && (connected || reconnecting || protectedFault);
+    }
+
+    private void ShowMessage(string? message, bool isError)
+    {
+        MessageText.Text = message ?? string.Empty;
+        MessageText.Foreground = isError
+            ? (Brush)FindResource("DangerBrush")
+            : (Brush)FindResource("TextSecondaryBrush");
+        MessageBorder.Visibility = string.IsNullOrWhiteSpace(message)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
     }
 }
