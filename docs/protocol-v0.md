@@ -1,50 +1,50 @@
 # Halo Protocol v0 — Stage 1
 
-Status: experimental laboratory protocol; not suitable for real VPN traffic.
+Статус: экспериментальный лабораторный протокол; сам по себе не предназначен для production VPN-трафика.
 
-## Scope and layering
+## Область и разделение ответственности
 
-Stage 1 exchanges opaque ping/pong messages over UDP. .NET owns envelope parsing, socket lifetime, cancellation, endpoints, timeouts, and diagnostics. The Rust core owns `Noise_IK_25519_ChaChaPoly_SHA256`, static/ephemeral/traffic secret state, stateless transport cipher states, outbound counter enforcement, and replay protection. No TUN/TAP, routing, DNS, UI, ASP.NET, database, Docker, traffic masking, padding, DPI evasion, negotiation, or multi-user node exists.
+Stage 1 передаёт непрозрачные сообщения ping/pong через UDP. .NET отвечает за разбор envelope, время жизни сокета, отмену, endpoints, тайм-ауты и диагностику. Rust-ядро владеет `Noise_IK_25519_ChaChaPoly_SHA256`, статическими, эфемерными и traffic secrets, stateless transport cipher states, проверкой исходящего счётчика и replay protection. Лабораторные приложения Stage 1 не содержат TUN/TAP, маршрутизацию, DNS, UI, ASP.NET, базу данных, Docker, маскировку, padding, обход DPI, согласование протокола или многопользовательский узел; эти платформенные функции не являются частью wire protocol.
 
-## Identity and handshake
+## Идентичность и handshake
 
-- server: one static X25519 private key;
-- client: one static X25519 private key;
-- client is provisioned with the server static public key;
-- the one-client lab server is provisioned with the allowed client static public key;
-- Noise IK supplies a fresh ephemeral key from both peers and independent traffic directions;
-- a session becomes established only after Noise completes and the server constant-time matches the authenticated initiator static key.
+- сервер имеет один статический приватный ключ X25519;
+- клиент имеет один статический приватный ключ X25519;
+- клиенту заранее передаётся статический публичный ключ сервера;
+- одноклиентскому лабораторному серверу заранее передаётся разрешённый статический публичный ключ клиента;
+- Noise IK создаёт свежий эфемерный ключ у каждой стороны и независимые направления трафика;
+- сессия устанавливается только после завершения Noise и constant-time сравнения аутентифицированного статического ключа инициатора с разрешённым ключом на сервере.
 
-The fixed prologue binds Stage 1, wire version zero, and the exact Noise name. There is no downgrade or suite negotiation. A nonzero client-generated connection ID correlates the two handshake messages and identifies established datagrams; it is neither an identity nor an authorization token.
+Фиксированный prologue связывает Stage 1, wire version 0 и точное имя Noise-протокола. Downgrade и согласование suite отсутствуют. Созданный клиентом ненулевой connection ID связывает два handshake-сообщения и идентифицирует установленные datagrams; он не является идентичностью или токеном авторизации.
 
-## State and messages
+## Состояния и сообщения
 
-Client: `Created -> Handshaking -> Established -> Closing -> Closed`.
+Клиент: `Created -> Handshaking -> Established -> Closing -> Closed`.
 
-Server: `Created -> Handshaking -> Established -> Closed`.
+Сервер: `Created -> Handshaking -> Established -> Closed`.
 
-Invalid transitions return a stable safe error and do not advance transport state. Messages are `HandshakeInit`, `HandshakeResponse`, `Data`, `KeepAlive`, and authenticated advisory `Close`. Stage 1 labs remain minimal; the Private MVP Windows transport retransmits the exact serialized `HandshakeInit` with bounded backoff, while the node keeps a short bounded cache of the exact response keyed by source endpoint, connection ID and SHA-256 digest of the initiation.
+Некорректные переходы возвращают стабильную безопасную ошибку и не изменяют transport state. Типы сообщений: `HandshakeInit`, `HandshakeResponse`, `Data`, `KeepAlive` и аутентифицированный рекомендательный `Close`. Лабораторные приложения Stage 1 остаются минимальными. Windows transport Private MVP повторно отправляет байт-в-байт один и тот же сериализованный `HandshakeInit` с ограниченным backoff, а узел хранит короткий bounded cache точного ответа по source endpoint, connection ID и SHA-256 digest инициирующего сообщения.
 
-## UDP laboratory policy
+## Лабораторная UDP-политика
 
-- fixed 1400-byte receive bound and no user-space receive queue;
-- asynchronous send/receive with `CancellationToken`;
-- ten-second handshake timeout and 180-second library idle default (ServerLab uses 30 seconds);
-- one pending/active client in ServerLab;
-- at most one pending session and eight attempts per ten-second window;
-- no endpoint is considered authenticated until the IK message verifies;
-- datagrams from a different endpoint are ignored after establishment;
-- unknown/malformed inputs receive no protocol error response.
+- фиксированный receive bound 1400 байт без пользовательской receive queue;
+- асинхронные send/receive с `CancellationToken`;
+- handshake timeout 10 секунд и библиотечный idle timeout 180 секунд; ServerLab использует 30 секунд;
+- одна pending или active сессия в ServerLab;
+- не более одной pending-сессии и восьми попыток за десятисекундное окно;
+- endpoint не считается аутентифицированным до проверки IK-сообщения;
+- после установления пакеты с другого endpoint игнорируются;
+- для неизвестных или повреждённых входных данных protocol error не отправляется.
 
-This is minimal allocation/rate protection, not a production anti-DoS cookie design.
+Это минимальная защита от выделения ресурсов и частоты запросов, а не production-схема anti-DoS cookie.
 
-## Replay, usage, and close
+## Replay, лимиты и закрытие
 
-The details are in `wire-format.md`. Each direction has a 2048-packet replay window and a `2^32` message limit. Modified packets do not advance the window. There is no automatic rekey or overlap state: `KeyLimitReached` requires close plus a new handshake. Idle timeout or authenticated Close destroys the native session handle and drops Noise state.
+Подробности приведены в [wire-format.md](wire-format.md). Каждое направление имеет replay window на 2048 пакетов и лимит `2^32` сообщений. Изменённый пакет не продвигает окно. Автоматический rekey и overlap state отсутствуют: `KeyLimitReached` требует закрыть сессию и выполнить новый handshake. Idle timeout или аутентифицированный `Close` уничтожает нативный handle сессии и удаляет Noise state.
 
-## Native ABI
+## Нативный ABI
 
-The synchronized header is `native/halo-protocol/include/halo_protocol.h`. Exports are:
+Синхронизированный заголовок находится в `native/halo-protocol/include/halo_protocol.h`. Экспортируются:
 
 - `halo_abi_version`
 - `halo_session_create_client`
@@ -58,17 +58,16 @@ The synchronized header is `native/halo-protocol/include/halo_protocol.h`. Expor
 - `halo_generate_keypair`
 - `halo_error_message`
 
-All functions are `extern "C"`, catch Rust unwinding, return stable integer error codes, validate nulls/lengths, and use caller-owned buffers. Output length is caller-owned and reports the actual or required size. A handle is a nonzero integer lookup key, never a C# pointer to a Rust object. Destroy removes it from a bounded synchronized registry; subsequent use/destroy returns `InvalidHandle`. The registry serializes calls, and the C# wrapper additionally locks each session. Rust never returns a pointer to temporary storage.
+Все функции имеют `extern "C"`, перехватывают Rust unwinding, возвращают стабильные целочисленные коды ошибок, проверяют null и длины и используют принадлежащие вызывающей стороне буферы. Длина результата принадлежит вызывающей стороне и сообщает фактический либо необходимый размер. Handle — ненулевой целочисленный ключ поиска, а не C#-указатель на Rust-объект. Destroy удаляет его из ограниченного синхронизированного registry; последующее использование или повторный destroy возвращает `InvalidHandle`. Registry сериализует вызовы, а C#-обёртка дополнительно блокирует каждую сессию. Rust не возвращает указатели на временную память.
 
-The decrypt ABI receives the expected 24-byte outer prefix so Rust verifies it before replay commit. Error text is fixed and contains no key, plaintext, raw packet, or internal crypto state.
+Decrypt ABI получает ожидаемый 24-байтовый внешний prefix, чтобы Rust проверил его до фиксации replay. Текст ошибки фиксирован и не содержит ключ, plaintext, raw packet или внутреннее криптографическое состояние.
 
-## Current limitations
+## Текущие ограничения
 
-- one active laboratory client;
-- Stage 1 lab applications still omit retransmission and NAT keepalive; the Private MVP supplies bounded handshake retransmission and authenticated keepalive/liveness outside the Rust state machine;
-- no automatic rekey;
-- no secure OS keystore integration (the lab uses explicit raw key files);
-- Windows ACL strength depends on the user-selected parent directory;
-- Linux runtime/build integration is not yet automated;
-- fuzz targets are prepared but no fuzz-duration result is claimed;
-- no independent security audit or production hardening.
+- один активный клиент в лабораторном ServerLab;
+- приложения Stage 1 не выполняют retransmission и NAT keepalive; Private MVP реализует ограниченную повторную отправку handshake и аутентифицированный keepalive/liveness вне Rust state machine;
+- автоматический rekey отсутствует;
+- лаборатория использует явные raw key files вместо защищённого OS keystore;
+- сила Windows ACL лабораторного ключа зависит от выбранного пользователем родительского каталога;
+- fuzz targets подготовлены, но длительная fuzz-кампания не заявляется;
+- независимый аудит безопасности не проводился.

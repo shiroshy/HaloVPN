@@ -90,6 +90,7 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
           <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -153,7 +154,18 @@
                  ToolTip="HTTPS-адрес ControlPlane"
                  Text="https://" />
 
-        <Grid Grid.Row="5" Margin="0,0,0,16">
+        <StackPanel Grid.Row="5" Margin="0,0,0,16">
+          <TextBlock Margin="2,0,0,7"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     FontSize="12"
+                     FontWeight="SemiBold"
+                     Text="SPKI PIN (ЕСЛИ ВЫДАН)" />
+          <TextBox x:Name="SpkiPinBox"
+                   Style="{StaticResource FieldTextBoxStyle}"
+                   ToolTip="Необязательный Base64 SHA-256 SPKI pin для частного сертификата" />
+        </StackPanel>
+
+        <Grid Grid.Row="6" Margin="0,0,0,16">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="14" />
@@ -182,13 +194,13 @@
         </Grid>
 
         <Button x:Name="LoginButton"
-                Grid.Row="6"
+                Grid.Row="7"
                 Margin="0,2,0,16"
                 Style="{StaticResource PrimaryButtonStyle}"
                 Content="ВОЙТИ"
                 Click="Login_Click" />
 
-        <StackPanel Grid.Row="7"
+        <StackPanel Grid.Row="8"
                     HorizontalAlignment="Center"
                     Orientation="Horizontal">
           <Ellipse Width="7"

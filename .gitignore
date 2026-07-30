@@ -28,6 +28,7 @@ local/
 # Build artifacts
 artifacts/
 publish/
+test/
 *.dll
 *.exe
 *.pdb

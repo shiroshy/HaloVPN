@@ -167,6 +167,49 @@ public sealed class WindowsLogicTests
     }
 
     [Fact]
+    public void OneClickSetupUsesNativeBootstrapperWithoutPowerShell()
+    {
+        var repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var program = File.ReadAllText(Path.Combine(repositoryRoot, "src", "HaloVPN.Setup", "Program.cs"));
+        var manifest = File.ReadAllText(Path.Combine(repositoryRoot, "src", "HaloVPN.Setup", "app.manifest"));
+        Assert.Contains("Verb = \"runas\"", program, StringComparison.Ordinal);
+        Assert.Contains("LocalSystem", program, StringComparison.Ordinal);
+        Assert.Contains("CryptographicOperations.FixedTimeEquals", program, StringComparison.Ordinal);
+        Assert.Contains("HALOVPN_PAYLOAD1", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("powershell", program, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotMatch(@"S-1-5-21-\d+", program);
+        Assert.Contains("level=\"asInvoker\"", manifest, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OneClickBuildWaitsForRealPayloadVerification()
+    {
+        var repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var script = File.ReadAllText(Path.Combine(repositoryRoot, "scripts", "build-windows-oneclick.ps1"));
+        Assert.Contains("HALOVPN_PAYLOAD1", script, StringComparison.Ordinal);
+        Assert.Contains("-ArgumentList \"--verify\"", script, StringComparison.Ordinal);
+        Assert.Contains("-Wait", script, StringComparison.Ordinal);
+        Assert.Contains("ExitCode", script, StringComparison.Ordinal);
+        Assert.Contains("appsettings*.json", script, StringComparison.Ordinal);
+        Assert.Contains("Get-AuthenticodeSignature", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OneClickUpdatePreservesConfigurationAndHasRollback()
+    {
+        var repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var program = File.ReadAllText(Path.Combine(repositoryRoot, "src", "HaloVPN.Setup", "Program.cs"));
+        Assert.Contains("IsCurrentRelease", program, StringComparison.Ordinal);
+        Assert.Contains("TryRollbackUpdate", program, StringComparison.Ordinal);
+        Assert.Contains("Production appsettings.json изменился", program, StringComparison.Ordinal);
+        Assert.Contains("network-plan.json", program, StringComparison.Ordinal);
+        Assert.Contains("[\"stop\", ServiceName]", program, StringComparison.Ordinal);
+        Assert.Contains("[\"start\", ServiceName]", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("Directory.Delete(DataDirectory", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("DisconnectAsync", program, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task TypedGuardJournalRoundTripsAndRejectsCommandPayload()
     {
         var directory = Path.Combine(Path.GetTempPath(), "halovpn-guard-test-" + Guid.NewGuid().ToString("N"));

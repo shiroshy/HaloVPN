@@ -1,38 +1,38 @@
-# Halo Protocol v0 Wire Format
+# Wire Format Halo Protocol v0
 
-Status: Stage 1 experimental laboratory format. All multibyte integers are unsigned and encoded in network byte order (big-endian).
+Статус: экспериментальный лабораторный формат Stage 1. Все многобайтовые целые числа без знака кодируются в сетевом порядке байтов (big-endian).
 
-## Common envelope
+## Общий envelope
 
-Every UDP datagram is exactly one envelope. The fixed header is 24 bytes:
+Каждый UDP datagram содержит ровно один envelope. Фиксированный заголовок имеет размер 24 байта:
 
-| Offset | Size | Field | Rule |
+| Смещение | Размер | Поле | Правило |
 |---:|---:|---|---|
 | 0 | 2 | `magic` | `0x48 0x56` (`HV`) |
-| 2 | 1 | `version` | `0x00` only |
-| 3 | 1 | `message_type` | table below |
-| 4 | 2 | `flags` | zero in v0 |
-| 6 | 8 | `connection_id` | nonzero opaque identifier |
-| 14 | 8 | `packet_number` | zero for handshake; per-direction counter for transport |
-| 22 | 2 | `payload_length` | exact bytes after the header |
+| 2 | 1 | `version` | только `0x00` |
+| 3 | 1 | `message_type` | таблица ниже |
+| 4 | 2 | `flags` | ноль в v0 |
+| 6 | 8 | `connection_id` | ненулевой непрозрачный идентификатор |
+| 14 | 8 | `packet_number` | ноль для handshake; счётчик направления для transport |
+| 22 | 2 | `payload_length` | точное число байтов после заголовка |
 
-The total datagram length must equal `24 + payload_length`; trailing bytes are invalid. The parser rejects inputs below 24 bytes, above 1400 bytes, bad magic, unknown version/type, nonzero flags, inconsistent length, and type-specific excess before allocation based on network data.
+Полный размер datagram обязан равняться `24 + payload_length`; trailing bytes запрещены. Parser до выделения памяти на основании сетевых данных отвергает вход короче 24 и длиннее 1400 байт, неверный magic, неизвестную версию или тип, ненулевые flags, несогласованную длину и превышение лимита конкретного типа.
 
-| Value | Type | Maximum body | Emitted Stage 1 body |
+| Значение | Тип | Максимальное body | Body Stage 1 |
 |---:|---|---:|---:|
-| `0x01` | `HandshakeInit` | 488 | 96 for empty IK payload |
-| `0x02` | `HandshakeResponse` | 488 | 48 for empty IK payload |
+| `0x01` | `HandshakeInit` | 488 | 96 для пустого IK payload |
+| `0x02` | `HandshakeResponse` | 488 | 48 для пустого IK payload |
 | `0x10` | `Data` | 1244 | `44 + application_length` |
 | `0x11` | `KeepAlive` | 40 | 40 |
 | `0x12` | `Close` | 48 | 48 |
 
-The unauthenticated handshake datagram limit is 512 bytes. The UDP carrier buffer limit is 1400 bytes. A Stage 1 sender emits at most 1268 bytes because application plaintext is limited to 1200 bytes.
+Лимит неаутентифицированного handshake datagram — 512 байт. Лимит буфера UDP carrier — 1400 байт. Отправитель Stage 1 создаёт не более 1268 байт, поскольку application plaintext ограничен 1200 байтами.
 
 ## Handshake
 
-`HandshakeInit` and `HandshakeResponse` bodies are the first and second Noise IK messages with empty Noise payloads. The client generates a random nonzero connection ID and the response echoes it. The identifier is not secret and grants no authority. The server binds an endpoint only after the first IK message authenticates the allow-listed client static key; the client accepts only a response from its configured endpoint and authenticated server static key.
+Body `HandshakeInit` и `HandshakeResponse` — первое и второе сообщения Noise IK с пустыми Noise payload. Клиент создаёт случайный ненулевой connection ID, а ответ повторяет его. Идентификатор не является секретом и не предоставляет полномочий. Сервер связывает endpoint только после того, как первое IK-сообщение аутентифицирует статический ключ клиента из allowlist. Клиент принимает ответ только от настроенного endpoint и аутентифицированного статического ключа сервера.
 
-The fixed Noise prologue is the ASCII byte string:
+Фиксированный Noise prologue — ASCII-строка:
 
 ```text
 HaloVPN Stage 1|wire=0|Noise_IK_25519_ChaChaPoly_SHA256
@@ -40,35 +40,35 @@ HaloVPN Stage 1|wire=0|Noise_IK_25519_ChaChaPoly_SHA256
 
 ## Transport protection
 
-`snow::StatelessTransportState` receives the outer `packet_number` as its Noise transport nonce. The packet number on the wire remains big-endian; nonce formatting inside ChaChaPoly follows the Noise/snow implementation.
+`snow::StatelessTransportState` получает внешний `packet_number` как Noise transport nonce. В wire format packet number остаётся big-endian; внутреннее форматирование nonce для ChaChaPoly определяется Noise и реализацией snow.
 
-Because snow's stateless API does not accept caller-supplied associated data, Stage 1 authenticates the outer header by placing an exact 24-byte copy at the start of the encrypted plaintext:
+Stateless API snow не принимает associated data, поэтому Stage 1 аутентифицирует внешний заголовок, помещая его точную 24-байтовую копию в начало зашифрованного plaintext:
 
 ```text
 NoiseEncrypt(packet_number, outer_header || protected_message)
 ```
 
-Rust decrypts and constant-time compares that prefix with the received outer header before committing the replay-window update. Changing connection ID, type, flags, length, or packet number therefore cannot make the packet valid or consume the replay slot. The 16-byte ChaCha20-Poly1305 tag is included in `payload_length`.
+Rust расшифровывает и constant-time сравнением проверяет этот prefix с полученным внешним заголовком до изменения replay window. Поэтому изменение connection ID, type, flags, length или packet number не делает пакет действительным и не занимает позицию replay. 16-байтовый tag ChaCha20-Poly1305 включается в `payload_length`.
 
-### Data protected message
+### Защищённое сообщение Data
 
-After the encrypted header copy:
+После зашифрованной копии заголовка:
 
-| Offset | Size | Field | Rule |
+| Смещение | Размер | Поле | Правило |
 |---:|---:|---|---|
-| 0 | 1 | `payload_type` | zero (`OpaqueTestData`) |
-| 1 | 1 | `payload_flags` | zero |
-| 2 | 2 | `payload_length` | 0 through 1200, big-endian |
-| 4 | N | payload | exactly N bytes |
+| 0 | 1 | `payload_type` | ноль (`OpaqueTestData`) |
+| 1 | 1 | `payload_flags` | ноль |
+| 2 | 2 | `payload_length` | от 0 до 1200, big-endian |
+| 4 | N | payload | ровно N байт |
 
-Compression, padding, batching, and fragmentation are absent.
+Compression, padding, batching и fragmentation отсутствуют.
 
-### KeepAlive and Close
+### KeepAlive и Close
 
-KeepAlive has no protected bytes after the encrypted header copy. Close has 8 bytes: big-endian `reason:u16`, zero `reserved:u16`, and `detail:u32`. Both consume packet numbers and replay-window positions.
+У KeepAlive нет защищённых байтов после зашифрованной копии заголовка. Close содержит 8 байт: big-endian `reason:u16`, нулевой `reserved:u16` и `detail:u32`. Оба типа расходуют packet number и позицию replay window.
 
-## Replay and limits
+## Replay и лимиты
 
-Each direction starts at packet number zero. Rust requires outbound numbers to be exactly sequential, rejects duplicates, accepts unseen reordering within a fixed 2048-packet window, and rejects older packets. The window is 2048 to tolerate bounded UDP reordering while keeping per-session state fixed (2048 booleans in the current lab implementation). Authentication failure does not update it.
+Каждое направление начинает с packet number 0. Rust требует строго последовательные исходящие номера, отвергает дубликаты, принимает ранее не встречавшуюся перестановку внутри фиксированного окна на 2048 пакетов и отвергает более старые пакеты. Размер 2048 допускает ограниченную UDP-перестановку при фиксированном объёме состояния сессии: текущая лабораторная реализация использует 2048 boolean-значений. Ошибка аутентификации не изменяет окно.
 
-Packet number `2^32` and above returns `KeyLimitReached`; automatic rekey is not implemented. The session must close and perform a fresh handshake. This engineering limit is below primitive exhaustion and prevents wrap/reuse.
+Packet number `2^32` и выше возвращает `KeyLimitReached`; автоматический rekey не реализован. Сессия должна закрыться и выполнить новый handshake. Этот инженерный лимит ниже исчерпания примитива и предотвращает wrap или повторное использование.

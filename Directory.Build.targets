@@ -1,5 +1,5 @@
 <Project>
-  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)artifacts\native\$(Configuration)\win-x64\halo_protocol.dll')">
+  <ItemGroup Condition="'$(SkipHaloNativeCopy)' != 'true' and Exists('$(MSBuildThisFileDirectory)artifacts\native\$(Configuration)\win-x64\halo_protocol.dll')">
     <None Include="$(MSBuildThisFileDirectory)artifacts\native\$(Configuration)\win-x64\halo_protocol.dll"
           Link="halo_protocol.dll"
           CopyToOutputDirectory="PreserveNewest"

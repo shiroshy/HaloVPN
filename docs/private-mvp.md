@@ -1,30 +1,31 @@
-# Private MVP architecture and operation
+# Архитектура и эксплуатация Private MVP
 
-This stage preserves the Stage 1 wire format and exactly `Noise_IK_25519_ChaChaPoly_SHA256`. Login/password authenticate only HTTPS ControlPlane requests. The UDP tunnel accepts a device only when its static Noise public key is in the bounded active-device allowlist; passwords and tokens never enter the Noise handshake.
+Private MVP сохраняет wire format Stage 1 и точный протокол `Noise_IK_25519_ChaChaPoly_SHA256`. Логин и пароль аутентифицируют только HTTPS-запросы ControlPlane. UDP-туннель принимает устройство, только если его статический публичный Noise-ключ находится в ограниченном allowlist активных устройств; пароль и токены никогда не входят в Noise handshake.
 
-## Components
+## Компоненты
 
-- `HaloVPN.ControlPlane`: ASP.NET Core API, HTTPS enforcement outside Development, per-source login/refresh rate limiting, JWT access tokens (15 minutes by default), transactionally rotating hashed refresh tokens, device enrollment and profiles. PostgreSQL locks the presented token row; the parent revocation, replacement insert and `replaced_by_token_id` update commit together. Concurrent reuse deterministically revokes the family, including the newly issued child, so at most one request receives a replacement and it cannot remain usable after the race.
-- `HaloVPN.Infrastructure`: EF Core/Npgsql PostgreSQL model, Argon2id password hashing, transactional address allocation, auth/device/admin services and the node read-only authorization repository.
-- `HaloVPN.AdminCli`: owner-only user/device/token administration and `database migrate`. Passwords are read without echo or from two redirected stdin lines, never from arguments.
-- `HaloVPN.Node` + `HaloVPN.Platform.Linux`: bounded multi-client Noise sessions, `/dev/net/tun`, source-address anti-spoofing, client-to-client blocking, outbound destination policy and fail-closed authorization for new sessions. A recent bounded allowlist snapshot lets existing sessions survive a brief PostgreSQL/ControlPlane outage. Default special/private destinations, the tunnel subnet and local VPS addresses are rejected before TUN; the owned nftables table repeats the critical restrictions.
-- `HaloVPN.WindowsService` + `HaloVPN.Platform.Windows`: LocalMachine-DPAPI device key, official Wintun ABI wrapper, Noise/UDP packet pumps, reversible route/DNS/IPv6 plans and user/admin ACL-protected named-pipe IPC. The persistent guard (Wintun, `/1` routes, exact node/bootstrap `/32` routes, DNS and IPv6 block) survives transport reconnect and service restart. Its bounded journal stores only a versioned validated descriptor, never executable paths or arguments; only explicit Disconnect/Logout rolls it back.
-- `HaloVPN.Desktop`: non-elevated WPF login/connect UI. The access token stays in memory and the refresh token is CurrentUser-DPAPI protected. The Desktop never receives the device private key.
+- `HaloVPN.ControlPlane`: ASP.NET Core API, обязательный HTTPS вне Development, login/refresh rate limit по источнику, JWT access token со сроком 15 минут по умолчанию, транзакционная ротация хэшированных refresh token, регистрация устройств и выдача профиля. PostgreSQL блокирует строку предъявленного токена; отзыв parent, вставка replacement и обновление `replaced_by_token_id` фиксируются одной транзакцией. Параллельное повторное использование детерминированно отзывает всю family, включая созданный child: не более одного запроса получает replacement, и после гонки он не остаётся пригодным к использованию.
+- `HaloVPN.Infrastructure`: модель EF Core/Npgsql PostgreSQL, Argon2id для паролей, транзакционное выделение адресов, auth/device/admin services и read-only authorization repository узла.
+- `HaloVPN.AdminCli`: доступное только владельцу управление пользователями, устройствами и токенами, а также `database migrate`. Пароль читается без отображения либо из двух перенаправленных строк stdin, но никогда из аргументов.
+- `HaloVPN.Node` и `HaloVPN.Platform.Linux`: ограниченные многоклиентские Noise-сессии, `/dev/net/tun`, source-address anti-spoofing, запрет client-to-client, outbound destination policy и fail-closed авторизация новых сессий. Недавний bounded snapshot allowlist позволяет существующим сессиям пережить краткую недоступность PostgreSQL или ControlPlane. Специальные и private destinations по умолчанию, tunnel subnet и локальные адреса VPS отвергаются до TUN; принадлежащая HaloVPN nftables table повторяет критические ограничения.
+- `HaloVPN.WindowsService` и `HaloVPN.Platform.Windows`: LocalMachine DPAPI для device key, wrapper официального Wintun ABI, Noise/UDP packet pumps, обратимые route/DNS/IPv6 plans и named-pipe IPC с ACL пользователя и администраторов. Persistent guard — Wintun, `/1`, точные node/bootstrap `/32`, DNS и IPv6 block — сохраняется при transport reconnect и перезапуске службы. Ограниченный journal хранит только versioned typed descriptor, но не executable paths или arguments; rollback выполняется только при явном Disconnect или Logout.
+- `HaloVPN.Desktop`: непривилегированный WPF-клиент для login/connect. Access token хранится в памяти, refresh token защищён CurrentUser DPAPI. Desktop никогда не получает приватный ключ устройства.
+- `HaloVPN.Setup`: единый нативный Windows bootstrapper, проверка встроенного payload, первая установка и rollback-safe обновление без PowerShell у тестера.
 
-PostgreSQL uses UTC timestamps, snake_case names and unique indexes for normalized usernames, device keys, leases and token hashes. Raw refresh tokens are never stored. The default `10.77.0.0/24`, gateway `10.77.0.1`, MTU 1200, session limit 16 and single `Astana-1` node are configuration values, not location-specific behavior. The node seed is skipped until a public host and a 32-byte public key are supplied.
+PostgreSQL использует UTC, имена snake_case и уникальные индексы для нормализованных username, device keys, leases и token hashes. Raw refresh token в базе не хранится. Подсеть, gateway, MTU, лимит сессий и профиль единственного узла являются конфигурацией, а не разбросанными по коду значениями. Seed узла пропускается, пока оператор не задаст public host и 32-байтовый публичный ключ.
 
-## ControlPlane and Admin CLI
+## ControlPlane и Admin CLI
 
-Set secrets through the process environment or an external secret store:
+Секреты задаются через environment процесса или внешнее хранилище:
 
 ```text
 HALOVPN_DATABASE=Host=...;Database=halovpn;Username=...;Password=...
-Tokens__SigningKeyBase64=<at-least-32-random-bytes>
-VpnNode__PublicHost=<operator-provided-host>
-VpnNode__PublicKeyBase64=<node-public-key>
+Tokens__SigningKeyBase64=<не-менее-32-случайных-байт>
+VpnNode__PublicHost=<адрес-заданный-оператором>
+VpnNode__PublicKeyBase64=<публичный-ключ-узла>
 ```
 
-Apply the checked-in initial migration and create users:
+Применение миграции и управление пользователем:
 
 ```powershell
 dotnet run --project src/HaloVPN.AdminCli -c Release -- database migrate
@@ -32,24 +33,77 @@ dotnet run --project src/HaloVPN.AdminCli -c Release -- user create alice 1
 dotnet run --project src/HaloVPN.AdminCli -c Release -- user disable alice
 ```
 
-Production ControlPlane rejects plain HTTP. A normal CA certificate is preferred. For a private deployment, set `HALOVPN_CONTROLPLANE_SPKI_PIN` on the Desktop to the Base64 SHA-256 of a pre-distributed certificate SPKI. The pin is never learned from the connection it authenticates. HTTP loopback is permitted only when the explicit development environment variable is `1`.
+Production ControlPlane отвергает plain HTTP. Предпочтителен обычный сертификат доверенного CA. Для частного развёртывания заранее переданный Base64 SHA-256 SPKI PIN вводится в опциональное поле Desktop; `HALOVPN_CONTROLPLANE_SPKI_PIN` остаётся compatibility fallback. PIN никогда не изучается через соединение, которое должен аутентифицировать. HTTP loopback разрешается только при явной development environment variable со значением `1`.
 
-## Windows prerequisites
+Raw refresh token не логируется и хранится в PostgreSQL только как хэш. Rotation выполняется в PostgreSQL-транзакции с блокировкой строки. При двух параллельных refresh один запрос может создать replacement, а обнаруживший reuse запрос отзывает всю family; созданный в этой гонке replacement после отзыва family также непригоден.
 
-Obtain the official Wintun x64 package from the Wintun project, review its license/redistribution terms, and put only the expected `wintun.dll` at `HaloVPN:WintunDllPath` (default `C:\Program Files\HaloVPN\wintun.dll`). No build or runtime path downloads it. Configure `HaloVPN:AllowedUserSid` to the intended Desktop user's SID before installing the service.
+## Windows
 
-The service creates a `HaloVPN` Layer-3 adapter, gives the public node/bootstrap IPv4 addresses exact host routes through the original selected gateway, adds two IPv4 `/1` routes through Wintun, applies adapter DNS, and temporarily blocks IPv6 with two explicitly named Windows Firewall rules. It journals only the typed inputs needed to reconstruct the allowlisted rollback plan and removes only those mutations. Unit tests do not modify the host network; real Wintun tests require an explicit administrator-run environment.
+### Предварительные требования
 
-Before enabling the guard, Desktop resolves the HTTPS ControlPlane hostname and passes at most 16 exact IPv4 bootstrap addresses to the service. HTTP connections use those fixed socket destinations while the original hostname remains the request host/TLS SNI and normal certificate validation plus the optional preconfigured SPKI pin remains active. The client sends the exact same serialized `HandshakeInit` up to four times (500 ms initial backoff, ten-second total default). After authentication it sends an encrypted `KeepAlive` after 20 seconds without outbound traffic; the node returns one bounded authenticated keepalive and the client reconnects protected after 65 seconds without authenticated inbound traffic.
+Получите официальный Wintun x64, проверьте лицензию распространения и поместите только ожидаемый `wintun.dll` по пути `HaloVPN:WintunDllPath`; по умолчанию это `C:\Program Files\HaloVPN\wintun.dll`. Build и runtime не скачивают DLL. При ручной установке перед запуском службы необходимо настроить `HaloVPN:AllowedUserSid` на SID пользователя Desktop.
+
+Read-only preflight:
+
+```powershell
+.\scripts\preflight-windows.ps1 -?
+```
+
+Он проверяет ОС, Wintun exports, каталоги и ACL, SID, HTTPS/SPKI, bootstrap IPv4 и конфликт tunnel subnet, но ничего не устанавливает и не меняет сеть.
+
+### Установщик тестера
+
+`scripts/build-windows-oneclick.ps1` создаёт единый `publish/windows-oneclick/HaloVPN.exe`, содержащий Desktop, LocalSystem-службу, нативное Halo Protocol ядро и проверенный подписанный Wintun. При первом запуске bootstrapper запоминает SID инициирующего пользователя до UAC, проверяет и устанавливает ограниченный payload и запускает службу.
+
+Когда тестер запускает полученный отдельно новый `HaloVPN.exe`, хэш встроенного релиза сравнивается с установленным marker. При различии предлагается in-place update. Новый payload полностью проверяется до остановки службы. Обновление сохраняет точный production `appsettings.json`, device data и persistent-guard journal, затем проверяет запуск новой службы. Локальный ограниченный backup восстанавливает предыдущие Desktop, Service, Wintun, license и launcher, если замена или запуск не удались.
+
+Остановка службы для обновления не отправляет Disconnect, поэтому активный guard остаётся fail closed. Запуск уже установленного актуального release открывает Desktop. Установщик не требует от тестера PowerShell.
+
+Setup проверяет SHA-256 приложенного payload, path traversal, состав компонентов и конкретный Wintun. Обновления распространяются как новый полный EXE; автоматического Internet download channel и доверенного signing-key root пока нет. Текущая private-сборка не подписана Authenticode, поэтому SmartScreen может показать неизвестного издателя.
+
+### Persistent network guard
+
+Служба создаёт Layer 3 adapter `HaloVPN`, добавляет для публичных node/bootstrap IPv4 точные host routes через исходный gateway, два IPv4 `/1` через Wintun, DNS адаптера и временный IPv6 block двумя явно именованными Windows Firewall rules. Journal содержит только typed inputs для реконструкции allowlisted rollback plan. Удаляются только HaloVPN-owned mutations.
+
+Порядок применения:
+
+1. открыть или создать Wintun adapter;
+2. дождаться interface index;
+3. назначить tunnel IPv4;
+4. применить MTU;
+5. добавить точный `/32` узла;
+6. добавить точные bootstrap `/32`;
+7. добавить full-tunnel `/1`;
+8. применить DNS;
+9. применить IPv6 guard;
+10. записать валидный journal.
+
+Ошибка до полного guard откатывает уже применённые owned mutations и оставляет обычную сеть. После установки guard transport failure не удаляет `/1` и IPv6 block: статус становится `ReconnectingProtected`, Wintun остаётся активным, а неотправленные пакеты ограниченно отбрасываются. Только explicit Disconnect или Logout удаляет guard. После аварии службы валидный journal восстанавливается как protected state, а не fail open.
+
+До включения guard Desktop разрешает HTTPS hostname ControlPlane и передаёт службе не более 16 точных bootstrap IPv4. HTTP-соединения используют эти фиксированные socket destinations, сохраняя исходный hostname как request host и TLS SNI, обычную проверку сертификата и опциональный заранее настроенный SPKI PIN.
+
+Клиент отправляет один и тот же сериализованный `HandshakeInit` до четырёх раз с начальным backoff 500 мс и общим timeout 10 секунд по умолчанию. После аутентификации он отправляет зашифрованный `KeepAlive` через 20 секунд без исходящего трафика. Узел возвращает один ограниченный аутентифицированный keepalive; после 65 секунд без аутентифицированного входящего трафика клиент переходит в protected reconnect.
+
+Unit tests не меняют сеть хоста. Реальные Wintun-проверки требуют явно запущенного администратором integration flow и возможности немедленного rollback.
 
 ## Linux VPS
 
-Use `deploy/linux/build-publish.sh Release`, then follow `deploy/linux/README.md`. The nftables installer requires the external interface as an argument, accepts `HALOVPN_TUNNEL_SUBNET`/`HALOVPN_TUN_INTERFACE`, and owns only the `halovpn_filter` and `halovpn_nat` tables. It never flushes the host firewall. ControlPlane and Node run as separate systemd services; the Node needs `/dev/net/tun` and `CAP_NET_ADMIN` but not a custom kernel driver.
+Используйте `deploy/linux/build-publish.sh Release`, затем следуйте [deploy/linux/README.md](../deploy/linux/README.md). Installer nftables требует явно заданный внешний интерфейс, принимает `HALOVPN_TUNNEL_SUBNET` и `HALOVPN_TUN_INTERFACE` и владеет только tables `halovpn_filter` и `halovpn_nat`. Он никогда не выполняет flush firewall хоста.
 
-Both preflights are read-only: `deploy/linux/preflight.sh` uses explicit `HALOVPN_*` environment values, and `scripts/preflight-windows.ps1` requires the expected Wintun/key/SID/URL/node/subnet arguments. They report prerequisites and conflicts without installing, routing or firewall changes.
+ControlPlane и Node работают отдельными systemd services. Node требуется `/dev/net/tun` и `CAP_NET_ADMIN`, но не custom kernel driver. Node проверяет source tunnel IPv4, блокирует client-to-client, multicast, broadcast, malformed packets, configured tunnel subnet, локальные интерфейсы VPS и denied destination CIDR до записи в TUN. Nftables дублирует критические outbound restrictions и разрешает NAT только из tunnel subnet через явно указанный external interface.
 
-## Verification and explicit limits
+Read-only preflight использует явные `HALOVPN_*` environment values:
 
-Local automated tests cover auth lifecycle, token rotation/reuse, device limits and leases, two concurrent native Noise clients, packet spoofing/client isolation, authorization-cache outage behavior, session/handshake bounds, Windows route/DNS/firewall planning, IPC parsing and DPAPI token storage. Stage 1 tamper/replay/10,000-message loopback tests remain unchanged.
+```bash
+sudo -E ./deploy/linux/preflight.sh
+```
 
-The repository does not prove a real VPS route, nftables NAT to the Internet, service installation, CA provisioning or Wintun operation because no VPS configuration or official DLL was supplied. IPv4 full tunnel only is implemented; split tunnel, IPv6 transport, public registration, payments, web administration, traffic masking and DPI evasion are deliberately absent. Destination addresses, DNS queries and packet contents are not audit-log data.
+Он сообщает prerequisites и конфликты без установки и без изменения routing, firewall или sysctl.
+
+## Проверка и явные ограничения
+
+Локальные автоматические тесты покрывают auth lifecycle, token rotation/reuse, device limits и leases, два параллельных нативных Noise-клиента, spoofing/client isolation, destination policy, authorization-cache outage, session/handshake bounds, Windows route/DNS/firewall planning, IPC parsing, DPAPI и обновление установщика. Тесты Stage 1 на tamper, replay и 10 000 loopback-сообщений сохранены.
+
+Исходный код и локальные тесты сами по себе не доказывают корректность маршрутов конкретного VPS, nftables NAT до Internet, TLS provisioning или реальной установки Wintun. Эти результаты фиксируются отдельно для каждого развёртывания.
+
+Реализован только IPv4 full tunnel. Split tunnel, IPv6 transport, публичная регистрация, платежи, web administration, маскировка трафика и обход DPI отсутствуют. Destination addresses, DNS queries и содержимое пакетов не являются audit-log данными.

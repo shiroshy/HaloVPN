@@ -1,111 +1,116 @@
-# HaloVPN Key Lifecycle v0
+# Жизненный цикл ключей HaloVPN v0
 
-Status: Stage 1 laboratory implementation
+Статус: Stage 1 и Private MVP
 
-## Key classes
+## Классы ключей
 
-### Device static key
+### Статический ключ устройства
 
-- X25519 key pair generated locally during enrollment.
-- Private key never leaves the device.
-- Public key is registered with the control plane and distributed to authorized nodes.
-- One key pair represents one independently revocable installation.
+- Пара X25519 создаётся локально при регистрации устройства.
+- Приватный ключ никогда не покидает устройство.
+- Публичный ключ регистрируется в ControlPlane и передаётся авторизованным узлам.
+- Одна пара представляет одну независимо отзываемую установку.
 
-### Node static key
+### Статический ключ узла
 
-- X25519 key pair generated on the VPN node.
-- Private key never enters the control-plane database.
-- Public key is delivered through signed bootstrap configuration.
-- Rotation is performed per node with a bounded overlap period.
+- Пара X25519 создаётся на VPN-узле.
+- Приватный ключ никогда не попадает в базу ControlPlane.
+- Публичный ключ доставляется клиенту в transport-профиле через защищённый ControlPlane.
+- Ротация выполняется отдельно для каждого узла с ограниченным overlap-периодом, когда такая процедура будет введена.
 
-### Ephemeral and traffic keys
+### Эфемерные и traffic keys
 
-- Every handshake creates fresh ephemeral keys.
-- Noise transport split derives independent client-to-node and node-to-client traffic keys.
-- Ephemeral and traffic keys are memory-only, never logged, and discarded on close or rekey.
+- Каждый handshake создаёт свежие эфемерные ключи.
+- Noise transport split получает независимые ключи направлений client-to-node и node-to-client.
+- Эфемерные и traffic keys существуют только в памяти, не логируются и удаляются при закрытии сессии или rekey.
 
-### Configuration-signing key
+### Ключ подписи конфигурации
 
-- Separate from device and node keys.
-- Signs bootstrap configuration, node identities, protocol policy, and revocation metadata.
-- The private signing key must not exist on ordinary VPN nodes.
+- Отделён от ключей устройств и узлов.
+- Предназначен для подписи bootstrap-конфигурации, идентичностей узлов, protocol policy и метаданных отзыва.
+- Приватный signing key не должен находиться на обычных VPN-узлах.
+- Полноценный удалённый подписанный канал конфигурации не входит в текущий Private MVP.
 
-## Device enrollment
+## Регистрация устройства
 
-1. The device generates a static key pair using the operating-system CSPRNG.
-2. The private key is stored using platform-protected storage.
-3. The public key is sent through an authenticated control-plane session.
-4. The control plane records owner, device identifier, public key, creation time, and status.
-5. Authorized nodes receive the active public key through authenticated synchronization.
+1. Windows Service создаёт статическую пару с использованием CSPRNG операционной системы.
+2. Приватный ключ сохраняется в защищённом платформой хранилище.
+3. Публичный ключ отправляется через аутентифицированную сессию ControlPlane.
+4. ControlPlane сохраняет владельца, идентификатор устройства, публичный ключ, время создания и статус.
+5. Авторизованные узлы получают активный публичный ключ через ограниченное синхронизированное представление allowlist.
 
-The system must never accept an uploaded client private key as an enrollment shortcut.
+Система никогда не должна принимать загруженный приватный ключ клиента как упрощённый способ регистрации.
 
-## Platform storage
+## Хранение на платформах
 
 ### Windows
 
-DPAPI/service storage remains future work. The Stage 1 KeyGen writes 32 raw bytes only to an explicit new path and refuses overwrite. On Windows it inherits the selected parent directory ACL, so the operator must use a restricted directory. This is a laboratory limitation, not production key storage.
+В Private MVP приватный ключ устройства создаётся Windows Service и хранится через LocalMachine DPAPI в каталоге с ACL для LocalSystem и администраторов. Desktop не получает приватный ключ. Повторная установка с удалением device data считается новым устройством.
 
-### Linux node
+Лабораторный KeyGen Stage 1 записывает 32 raw-байта только по явно указанному новому пути и запрещает перезапись. На Windows файл наследует ACL выбранного родительского каталога, поэтому оператор обязан использовать ограниченный каталог. Такой raw key file предназначен только для лаборатории.
 
-The node private key is stored outside source control and container images, owned by a dedicated service account, with owner-only permissions. It is excluded from logs, environment dumps, crash reports, and unencrypted backups.
+### Linux-узел
 
-## Session establishment
+Приватный ключ узла хранится вне source control и publish bundle, принадлежит выделенной service account и имеет права только для владельца. Он исключается из журналов, environment dumps, crash reports и незашифрованных резервных копий.
 
-The client authenticates the configured node static public key. The node authenticates the device static public key against its active authorization set. A session becomes established only after the cryptographic identity maps to an active, non-revoked device record.
+## Установление сессии
 
-## Key usage limits
+Клиент аутентифицирует настроенный статический публичный ключ узла. Узел проверяет статический публичный ключ устройства по активному authorization set. Сессия считается установленной только после того, как криптографическая идентичность сопоставлена с активным, неотозванным устройством активного пользователя.
 
-Stage 1 fixes these engineering limits:
+## Лимиты использования ключа
 
-- maximum packets per direction: `2^32`;
-- packet number must never wrap or be reused;
-- automatic rekey is absent, so the caller closes and performs a new IK handshake at the first `KeyLimitReached` result.
+Stage 1 фиксирует следующие инженерные лимиты:
 
-These are product limits, not claims about the theoretical maximum of the primitive.
+- максимум пакетов в одном направлении: `2^32`;
+- packet number никогда не должен переполняться или использоваться повторно;
+- автоматический rekey отсутствует, поэтому при первом `KeyLimitReached` вызывающая сторона закрывает сессию и выполняет новый IK handshake.
 
-## Rotation
+Это продуктовые лимиты, а не утверждение о теоретическом пределе криптографического примитива.
 
-### Device rotation
+## Ротация
 
-The device generates a new pair, enrolls the new public key while authenticated, proves possession through a fresh session, then revokes and erases the old key.
+### Ротация ключа устройства
 
-### Node rotation
+Устройство создаёт новую пару, аутентифицированно регистрирует новый публичный ключ, доказывает владение в новой сессии, затем отзывает и удаляет старый ключ. При `MaxDevices = 1` такая процедура требует управляемой замены или предварительного отзыва старой установки.
 
-The node generates a replacement key locally. Signed configuration may advertise old and new public keys during a bounded overlap. Clients prefer the new key and reject unadvertised keys.
+### Ротация ключа узла
 
-### Signing-key rotation
+Узел локально создаёт заменяющий ключ. Доверенная конфигурация может публиковать старый и новый публичные ключи в течение ограниченного overlap. Клиенты предпочитают новый ключ и отвергают ключи, отсутствующие в доверенной конфигурации.
 
-Signing-key rotation requires an offline root or explicitly documented cross-signing procedure. A compromised signing key requires emergency revocation and a recovery path that does not blindly trust that key.
+### Ротация signing key
 
-## Revocation
+Ротация signing key требует offline root либо явно документированной процедуры cross-signing. Компрометация signing key требует экстренного отзыва и recovery path, который не доверяет этому ключу автоматически.
 
-Revocation records contain the device or key identifier, monotonic generation, reason category, audit timestamp, and signature metadata. Nodes reject new handshakes from revoked keys and terminate matching established sessions when the update arrives.
+## Отзыв
 
-During control-plane outage, the laboratory policy permits previously authorized keys but rejects unknown identities and new enrollment.
+ControlPlane хранит статус пользователя и устройства. Узел запрещает новые handshake для Disabled User и Revoked Device. Обновлённый bounded allowlist позволяет завершать соответствующие существующие сессии после refresh.
 
-## Compromise response
+При краткой недоступности PostgreSQL узел использует только недавний ограниченный снимок для уже известных активных устройств. Новые неизвестные идентичности и регистрация fail closed.
 
-### Device compromise
+## Действия при компрометации
 
-Revoke the device, terminate sessions, generate a new pair, and inspect account sessions. The old private key cannot be restored from the server because it is never stored there.
+### Компрометация устройства
 
-### Node compromise
+Отозвать устройство, завершить его сессии, создать новую пару и проверить сессии аккаунта. Старый приватный ключ нельзя восстановить на сервере, поскольку он там никогда не сохранялся.
 
-Remove the node from discovery, revoke its public key, terminate sessions, rebuild from trusted media, and create a new key. Exit traffic observed at the compromised node is considered exposed.
+### Компрометация узла
 
-### Signing-key compromise
+Удалить узел из профилей, отозвать его публичный ключ, завершить сессии, пересобрать узел из доверенного источника и создать новый ключ. Выходящий трафик, наблюдавшийся на скомпрометированном узле, считается раскрытым.
 
-Freeze remote configuration, distribute emergency trust material through a separately authenticated release, revoke the old signer, and rotate all affected metadata.
+### Компрометация signing key
 
-## Logging prohibition
+Остановить принятие удалённой конфигурации, доставить emergency trust material отдельным аутентифицированным релизом, отозвать старый signer и перевыпустить затронутые метаданные.
 
-Never log private keys, traffic keys, ephemeral secrets, raw handshake state, decrypted packets, complete authenticated datagrams, or recovery material.
+## Запрет логирования
 
-## In-memory ownership and erasure
+Никогда не логировать приватные и traffic keys, эфемерные секреты, raw handshake state, расшифрованные пакеты, полные аутентифицированные datagrams или recovery material.
 
-Private-key input buffers are zeroed by the lab applications after Rust session creation. C# protected-message temporaries are zeroed with `CryptographicOperations.ZeroMemory`; Rust-generated private-key temporaries use `zeroize::Zeroizing`. Handshake and traffic keys remain entirely inside snow and its crypto backend and are dropped when the registry removes a session. Snow does not expose those session keys or a public method to prove immediate overwriting of every internal allocation, so Stage 1 documents that limitation instead of adding custom cryptography. Crash dumps, paging, and a compromised process remain outside this laboratory guarantee.
+## Владение памятью и очистка
 
-## Release gate
+Лабораторные приложения обнуляют входные буферы приватного ключа после создания Rust-сессии. Временные C#-буферы защищённых сообщений очищаются через `CryptographicOperations.ZeroMemory`; временные Rust-буферы с созданными приватными ключами используют `zeroize::Zeroizing`. Handshake- и traffic keys остаются внутри snow и его криптографического backend и удаляются при удалении сессии из registry.
 
-Production release requires tests for generation, storage permissions, restart recovery, rotation overlap, revocation propagation, counter exhaustion, failed rekey, and secret-free diagnostic output.
+Snow не предоставляет сессионные ключи наружу и не имеет публичного метода, доказывающего немедленную перезапись каждого внутреннего allocation. Поэтому проект документирует это ограничение и не добавляет собственную криптографию. Crash dumps, paging и полностью скомпрометированный процесс не покрываются этой гарантией.
+
+## Условие заявления о готовности
+
+Production-релиз требует проверки генерации, прав хранилища, восстановления после перезапуска, overlap при ротации, распространения отзыва, исчерпания счётчика, неудачного rekey и отсутствия секретов в диагностике.

@@ -47,7 +47,10 @@ public partial class MainWindow : Window
 
             _bootstrapIpv4Addresses = bootstrap.Select(value => value.ToString()).ToArray();
             _controlPlane?.Dispose();
-            _controlPlane = new ControlPlaneClient(baseAddress, Environment.GetEnvironmentVariable("HALOVPN_CONTROLPLANE_SPKI_PIN"), bootstrap);
+            var spkiPin = string.IsNullOrWhiteSpace(SpkiPinBox.Text)
+                ? Environment.GetEnvironmentVariable("HALOVPN_CONTROLPLANE_SPKI_PIN")
+                : SpkiPinBox.Text.Trim();
+            _controlPlane = new ControlPlaneClient(baseAddress, spkiPin, bootstrap);
             var tokens = await _controlPlane.LoginAsync(UsernameBox.Text, PasswordBox.Password, cancellationToken).ConfigureAwait(true);
             PasswordBox.Clear();
             var serviceResponse = await _service.SendAsync(IpcMessageType.GetPublicKey, null, cancellationToken).ConfigureAwait(true);

@@ -1,123 +1,125 @@
-# HaloVPN Threat Model v0
+# Модель угроз HaloVPN v0
 
-Status: Draft 0.1  
-Scope: Stage 1 laboratory secure datagram channel and future IP tunnel
+Статус: черновик 0.1
+Область: лабораторный защищённый datagram-канал Stage 1 и IP-туннель Private MVP
 
-## 1. Security objectives
+## 1. Цели безопасности
 
-HaloVPN must provide:
+HaloVPN должен обеспечивать:
 
-- confidentiality and integrity for tunneled payloads;
-- mutual authentication between an enrolled device and a VPN node;
-- forward secrecy for established sessions;
-- replay protection for handshake and transport packets;
-- downgrade resistance for negotiated protocol versions and capabilities;
-- strict validation of packet lengths, counters, identifiers, and state transitions;
-- fail-closed behavior when authentication or key state is uncertain.
+- конфиденциальность и целостность туннелируемых данных;
+- взаимную аутентификацию зарегистрированного устройства и VPN-узла;
+- forward secrecy для установленных сессий;
+- защиту handshake- и transport-пакетов от повторного воспроизведения;
+- защиту от downgrade версий и возможностей протокола;
+- строгую проверку размеров, счётчиков, идентификаторов и переходов состояния;
+- fail-closed поведение при неопределённом результате аутентификации или состоянии ключей.
 
-## 2. Protected assets
+## 2. Защищаемые данные
 
-- device static private keys;
-- node static private keys;
-- ephemeral handshake secrets;
-- active traffic keys and packet counters;
-- signed bootstrap and transport-profile configuration;
-- tunneled IP packets and DNS traffic;
-- device enrollment and revocation state.
+- статические приватные ключи устройств;
+- статические приватные ключи узлов;
+- эфемерные handshake-секреты;
+- активные traffic keys и счётчики пакетов;
+- подписанная bootstrap-конфигурация и транспортный профиль;
+- туннелируемые IP-пакеты и DNS-трафик;
+- состояние регистрации и отзыва устройств.
 
-## 3. Adversaries
+## 3. Противники
 
-### Passive network observer
+### Пассивный сетевой наблюдатель
 
-Can record packet sizes, timing, direction, endpoints, and all unencrypted bytes. Cannot initially break standard cryptographic primitives.
+Может записывать размеры, время, направление и endpoints пакетов, а также все незашифрованные байты. Изначально не способен взломать стандартные криптографические примитивы.
 
-### Active network attacker
+### Активный сетевой атакующий
 
-Can drop, delay, duplicate, reorder, replay, modify, and inject packets. Can redirect DNS and attempt downgrade or path-manipulation attacks.
+Может отбрасывать, задерживать, дублировать, переставлять, повторно отправлять, изменять и внедрять пакеты. Может подменять DNS и пытаться выполнить downgrade или изменить сетевой путь.
 
-### Active scanner
+### Активный сканер
 
-Can send arbitrary packets to a node and observe whether, when, and how it responds.
+Может отправлять узлу произвольные пакеты и наблюдать, отвечает ли узел, когда и каким образом.
 
-### Compromised control plane
+### Скомпрометированный ControlPlane
 
-Can read or alter control-plane database contents. It must not gain device or node private keys from the database alone.
+Может читать или изменять содержимое базы ControlPlane. Компрометация только базы не должна раскрывать приватные ключи устройств или узлов.
 
-### Compromised VPN node
+### Скомпрометированный VPN-узел
 
-Can observe traffic exiting that node and impersonate that node while its key remains trusted. Compromise of one node must not expose private keys of other nodes or devices.
+Может видеть выходящий через него трафик и выдавать себя за этот узел, пока его ключ остаётся доверенным. Компрометация одного узла не должна раскрывать приватные ключи других узлов или устройств.
 
-### Malicious enrolled client
+### Вредоносный зарегистрированный клиент
 
-Possesses valid credentials for one device and may send malformed, excessive, or adversarial protocol input.
+Владеет действительными данными одного устройства и может отправлять повреждённые, избыточные или специально подготовленные входные данные протокола.
 
-## 4. Assumptions
+## 4. Допущения
 
-- X25519, ChaCha20-Poly1305, and SHA-256 remain secure for this use.
-- Random-number generation is supplied by the operating system.
-- Endpoint devices and nodes are not already fully compromised.
-- Private keys are generated locally and are never transmitted to the control plane.
-- Time may be inaccurate; security must not depend solely on wall-clock correctness.
+- X25519, ChaCha20-Poly1305 и SHA-256 остаются безопасными для этого применения.
+- Генератор случайных чисел предоставляется операционной системой.
+- Клиентские устройства и узлы изначально не скомпрометированы полностью.
+- Приватные ключи создаются локально и никогда не передаются ControlPlane.
+- Системное время может быть неточным; безопасность не должна зависеть только от корректности wall clock.
 
-## 5. Non-goals for v0
+## 5. Что не является целью v0
 
-- anonymity against a global observer;
-- hiding the fact that an encrypted tunnel exists;
-- guaranteed resistance to all statistical traffic classification;
-- protection from malware running with administrator or root privileges;
-- multi-hop routing;
-- post-quantum security;
-- production-grade censorship circumvention.
+- анонимность перед глобальным наблюдателем;
+- сокрытие самого факта существования зашифрованного туннеля;
+- гарантированная защита от любой статистической классификации трафика;
+- защита от malware с правами администратора или root;
+- multi-hop маршрутизация;
+- постквантовая безопасность;
+- production-grade обход цензуры.
 
-## 6. Required mitigations
+## 6. Обязательные меры защиты
 
-### Cryptographic state
+### Криптографическое состояние
 
-- Use one reviewed Noise handshake pattern and one fixed cipher suite per protocol version.
-- Derive independent keys for each traffic direction.
-- Never reuse a nonce with the same key.
-- Enforce hard packet and byte limits per traffic key.
-- Erase superseded key material where the platform permits.
+- Использовать один проверенный Noise handshake pattern и один фиксированный cipher suite для каждой версии протокола.
+- Получать независимые ключи для каждого направления трафика.
+- Никогда не использовать один nonce повторно с тем же ключом.
+- Применять жёсткие лимиты пакетов и байтов для каждого traffic key.
+- Очищать заменённый ключевой материал там, где это позволяет платформа.
 
-### Replay and ordering
+### Повторное воспроизведение и порядок
 
-- Every transport packet carries an authenticated monotonically increasing packet number.
-- Receivers maintain a bounded sliding replay window.
-- Duplicate and stale packets are dropped without changing session state.
+- Каждый transport-пакет содержит аутентифицированный монотонно возрастающий packet number.
+- Получатель поддерживает ограниченное скользящее replay window.
+- Дубликаты и слишком старые пакеты отбрасываются без изменения состояния сессии.
 
-### Denial of service
+### Отказ в обслуживании
 
-- Parsing is bounded and allocation-aware before authentication.
-- Unknown clients do not cause large responses or persistent session allocation.
-- Handshake attempts are rate-limited by source and globally.
-- Queues, packet sizes, fragment counts, and concurrent sessions have explicit limits.
+- До аутентификации парсинг ограничен по ресурсам и учитывает выделение памяти.
+- Неизвестные клиенты не должны вызывать большие ответы или создание долгоживущего состояния.
+- Попытки handshake ограничиваются глобально и по источнику.
+- Очереди, размеры пакетов, число фрагментов и параллельных сессий имеют явные лимиты.
 
-### Versioning
+### Версионирование
 
-- Version and negotiated capabilities are authenticated by the handshake transcript.
-- Unsupported versions fail without silently falling back.
-- Remote configuration is accepted only when signature verification succeeds.
+- Версия и согласованные возможности аутентифицируются transcript handshake.
+- Неподдерживаемая версия завершается ошибкой без неявного fallback.
+- Удалённая конфигурация принимается только после успешной проверки подписи.
 
-### Platform integration
+### Интеграция с платформой
 
-- Kill-switch and routing changes are transactional where possible.
-- Failure to establish protected DNS or required routes prevents connected state.
-- Crash recovery must remove stale routes or keep the fail-closed firewall policy.
+- Изменения kill switch и маршрутизации должны быть транзакционными, где это возможно.
+- Невозможность применить защищённый DNS или обязательные маршруты запрещает переход в состояние Connected.
+- После аварии система должна удалить устаревшие маршруты либо сохранить fail-closed политику.
 
-## 7. Privacy boundaries
+## 7. Границы приватности
 
-The node necessarily sees decrypted destination IP traffic before forwarding it. The control plane must not receive tunneled payloads, destination addresses, or DNS queries. Diagnostic logging must exclude private keys, traffic keys, plaintext packets, authentication tags, and full configuration secrets.
+Перед пересылкой узел неизбежно видит расшифрованный IP-трафик назначения. ControlPlane не должен получать туннелируемые данные, адреса назначения или DNS-запросы. Диагностические журналы не должны содержать приватные и traffic keys, plaintext-пакеты, authentication tags и полные секреты конфигурации.
 
-## 8. Deferred questions after Stage 1
+## 8. Отложенные вопросы после Stage 1
 
-- Enrollment/control-plane flow beyond the fixed Stage 1 allow-list.
-- Stateless anti-DoS cookie design.
-- Rekey thresholds and overlap window.
-- Connection-ID rotation beyond the random client-generated Stage 1 identifier.
-- Padding and carrier-profile responsibilities.
-- Secure key storage choices on Windows and Linux.
-- Behavior during control-plane outage and revocation propagation.
+- Enrollment- и ControlPlane-поток за пределами фиксированного allowlist Stage 1.
+- Stateless anti-DoS cookie.
+- Пороги rekey и overlap window.
+- Ротация connection ID сверх случайного идентификатора Stage 1.
+- Ответственность padding и carrier profiles.
+- Варианты защищённого хранения ключей на Windows и Linux.
+- Поведение при недоступности ControlPlane и распространение отзыва.
 
-## 9. Release gate
+Часть этих вопросов реализована в Private MVP; оставшиеся решения не следует считать свойствами Stage 1.
 
-No production claim is allowed until protocol tests, fuzzing, dependency review, key-lifecycle review, and an independent security audit have been completed.
+## 9. Условие заявления о готовности
+
+Нельзя заявлять production-готовность до завершения тестов протокола, fuzzing, проверки зависимостей и жизненного цикла ключей, а также независимого аудита безопасности.
